@@ -1,0 +1,125 @@
+@charset "utf-8";
+
+h1, h2 {
+    background-color: #CCCCCC;
+}
+
+table {
+    border-collapse: collapse;
+}
+
+table, th, td {
+    border: 1px solid;
+}
+
+.warn {
+    color: #CC0000;
+}
+
+.has-tooltip {
+    text-decoration: underline dotted;
+}
+
+#app-container {
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+}
+
+#query-passwords-container {
+    flex: initial;
+    margin: 8px;
+    padding: 8px;
+    border: solid 2px;
+}
+
+#query-container {
+}
+
+#input-query {
+    width: 50em;
+}
+
+#passwords-container {
+    overflow: scroll;
+    height: 70vh;
+    border: solid 1px;
+}
+
+.passwords-item:hover {
+    background-color: cyan;
+    cursor: pointer;
+}
+
+#savedata-container {
+    flex: initial;
+    margin: 8px;
+    padding: 8px;
+    border: solid 2px;
+}
+
+#input-xp {
+    width: 6em;
+}
+
+#money-input-container {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-around;
+}
+
+#input-purse {
+    width: 6em;
+}
+
+#input-deposit {
+    width: 4em;
+}
+
+#ages-input-container {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-around;
+}
+
+#input-age {
+    width: 5em;
+}
+
+#input-age-timer-hi {
+    width: 5em;
+}
+
+#spells-input-container {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+}
+
+#treasures-input-container {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+}
+
+#minions-input-container {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-around;
+}
+
+#bookmarks-input-container {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+}
+
+#equipment-input-container {
+    display: grid;
+    grid-template-columns: 2fr 8fr;
+}
+
+.equipment-label {
+    text-align: center;
+}
+
+.equipment-input {
+    width: 100%;
+}

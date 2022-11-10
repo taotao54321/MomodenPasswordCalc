@@ -1,0 +1,3 @@
+# この設定がないと、rust-analyzer が動くたびに全体のリビルドが必要になってしまう。
+[build]
+target = "wasm32-unknown-unknown"
