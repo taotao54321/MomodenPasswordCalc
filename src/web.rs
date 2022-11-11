@@ -42,8 +42,21 @@ impl Default for Model {
     }
 }
 
+// NOTE:
+// seed はモデルが変化しても <select> 要素の表示を更新してくれない?
+// (https://github.com/seed-rs/seed/issues/558)
+// ブラウザによる挙動の違いもあるらしいので、<select> については自前で ElRef を持って更新する。
 #[derive(Debug, Default)]
 struct Refs {
+    respawn_select: ElRef<HtmlSelectElement>,
+    helm_select: ElRef<HtmlSelectElement>,
+    weapon_select: ElRef<HtmlSelectElement>,
+    armor_select: ElRef<HtmlSelectElement>,
+    shoes_select: ElRef<HtmlSelectElement>,
+    accessory0_select: ElRef<HtmlSelectElement>,
+    accessory1_select: ElRef<HtmlSelectElement>,
+    accessory2_select: ElRef<HtmlSelectElement>,
+    accessory3_select: ElRef<HtmlSelectElement>,
     inventory_selects: [ElRef<HtmlSelectElement>; 8],
 }
 
@@ -90,7 +103,7 @@ fn update(msg: Msg, model: &mut Model, _orders: &mut impl Orders<Msg>) {
                 let Some(savedata) = load_from_password(&password, model.normalize) else {
                         return;
                     };
-                model.savedata = savedata;
+                update_savedata(model, savedata);
             }
             Ok(Query::Pattern(pattern)) => {
                 model.passwords = generate_passwords(&pattern, PASSWORD_COUNT_MAX)
@@ -106,7 +119,7 @@ fn update(msg: Msg, model: &mut Model, _orders: &mut impl Orders<Msg>) {
                 return;
             };
             model.query = password.display_pretty().to_string();
-            model.savedata = savedata;
+            update_savedata(model, savedata);
         }
         Msg::SavedataUpdateXp(xp) => model.savedata.xp = xp,
         Msg::SavedataUpdatePurse(purse) => model.savedata.purse = purse,
@@ -118,24 +131,44 @@ fn update(msg: Msg, model: &mut Model, _orders: &mut impl Orders<Msg>) {
         Msg::SavedataToggleTreasure(treasure) => model.savedata.treasures[treasure].toggle(),
         Msg::SavedataToggleMinion(minion) => model.savedata.minions[minion].toggle(),
         Msg::SavedataToggleBookmark(bookmark) => model.savedata.bookmarks[bookmark].toggle(),
-        Msg::SavedataUpdateRespawn(respawn) => model.savedata.respawn = respawn,
-        Msg::SavedataUpdateHelm(helm) => model.savedata.equipment.helm = helm,
-        Msg::SavedataUpdateWeapon(weapon) => model.savedata.equipment.weapon = weapon,
-        Msg::SavedataUpdateArmor(armor) => model.savedata.equipment.armor = armor,
-        Msg::SavedataUpdateShoes(shoes) => model.savedata.equipment.shoes = shoes,
+        Msg::SavedataUpdateRespawn(respawn) => {
+            model.savedata.respawn = respawn;
+            update_respawn_select(model);
+        }
+        Msg::SavedataUpdateHelm(helm) => {
+            model.savedata.equipment.helm = helm;
+            update_helm_select(model);
+        }
+        Msg::SavedataUpdateWeapon(weapon) => {
+            model.savedata.equipment.weapon = weapon;
+            update_weapon_select(model);
+        }
+        Msg::SavedataUpdateArmor(armor) => {
+            model.savedata.equipment.armor = armor;
+            update_armor_select(model);
+        }
+        Msg::SavedataUpdateShoes(shoes) => {
+            model.savedata.equipment.shoes = shoes;
+            update_shoes_select(model);
+        }
         Msg::SavedataUpdateAccessory0(accessory0) => {
-            model.savedata.equipment.accessory0 = accessory0
+            model.savedata.equipment.accessory0 = accessory0;
+            update_accessory0_select(model);
         }
         Msg::SavedataUpdateAccessory1(accessory1) => {
-            model.savedata.equipment.accessory1 = accessory1
+            model.savedata.equipment.accessory1 = accessory1;
+            update_accessory1_select(model);
         }
         Msg::SavedataUpdateAccessory2(accessory2) => {
-            model.savedata.equipment.accessory2 = accessory2
+            model.savedata.equipment.accessory2 = accessory2;
+            update_accessory2_select(model);
         }
         Msg::SavedataUpdateAccessory3(accessory3) => {
-            model.savedata.equipment.accessory3 = accessory3
+            model.savedata.equipment.accessory3 = accessory3;
+            update_accessory3_select(model);
         }
         Msg::SavedataUpdateInventory(idx, item_id) => {
+            // 空欄は詰める(原作準拠)。
             let inventory = &mut model.savedata.inventory;
             match (idx < inventory.len(), item_id) {
                 (false, None) => {}
@@ -145,23 +178,101 @@ fn update(msg: Msg, model: &mut Model, _orders: &mut impl Orders<Msg>) {
                 }
                 (true, Some(item_id)) => inventory[idx] = item_id,
             }
-            // NOTE:
-            // seed はモデルが変化しても <select> 要素の表示を更新してくれない。
-            // (https://github.com/seed-rs/seed/issues/558)
-            // よって、自前で ElRef を持って更新する。
-            for i in 0..8 {
-                model.refs.inventory_selects[i]
-                    .get()
-                    .unwrap()
-                    .set_selected_index(inventory.get(i).map_or(0, |id| i32::from(id.get())));
-            }
+            update_inventory_selects(model);
         }
-        Msg::SavedataNormalize => model.savedata = model.savedata.normalize(),
+        Msg::SavedataNormalize => {
+            model.savedata = model.savedata.normalize();
+            update_helm_select(model);
+            update_weapon_select(model);
+            update_armor_select(model);
+            update_shoes_select(model);
+            update_accessory0_select(model);
+            update_accessory1_select(model);
+            update_accessory2_select(model);
+            update_accessory3_select(model);
+        }
         Msg::SavedataToPassword => {
             let password = save_to_password(&model.savedata);
             model.query = password.display_pretty().to_string();
         }
     }
+}
+
+fn update_savedata(model: &mut Model, savedata: Savedata) {
+    model.savedata = savedata;
+    update_respawn_select(model);
+    update_helm_select(model);
+    update_weapon_select(model);
+    update_armor_select(model);
+    update_shoes_select(model);
+    update_accessory0_select(model);
+    update_accessory1_select(model);
+    update_accessory2_select(model);
+    update_accessory3_select(model);
+    update_inventory_selects(model);
+}
+
+fn update_respawn_select(model: &Model) {
+    select_set_index(&model.refs.respawn_select, model.savedata.respawn);
+}
+
+fn update_helm_select(model: &Model) {
+    select_set_index(&model.refs.helm_select, model.savedata.equipment.helm);
+}
+
+fn update_weapon_select(model: &Model) {
+    select_set_index(&model.refs.weapon_select, model.savedata.equipment.weapon);
+}
+
+fn update_armor_select(model: &Model) {
+    select_set_index(&model.refs.armor_select, model.savedata.equipment.armor);
+}
+
+fn update_shoes_select(model: &Model) {
+    select_set_index(&model.refs.shoes_select, model.savedata.equipment.shoes);
+}
+
+fn update_accessory0_select(model: &Model) {
+    select_set_index(
+        &model.refs.accessory0_select,
+        model.savedata.equipment.accessory0,
+    );
+}
+
+fn update_accessory1_select(model: &Model) {
+    select_set_index(
+        &model.refs.accessory1_select,
+        model.savedata.equipment.accessory1,
+    );
+}
+
+fn update_accessory2_select(model: &Model) {
+    select_set_index(
+        &model.refs.accessory2_select,
+        model.savedata.equipment.accessory2,
+    );
+}
+
+fn update_accessory3_select(model: &Model) {
+    select_set_index(
+        &model.refs.accessory3_select,
+        model.savedata.equipment.accessory3,
+    );
+}
+
+fn update_inventory_selects(model: &Model) {
+    for i in 0..8 {
+        let idx = model.savedata.inventory.get(i).map_or(0, |id| id.get());
+        select_set_index(&model.refs.inventory_selects[i], idx);
+    }
+}
+
+fn select_set_index(er: &ElRef<HtmlSelectElement>, idx: impl Into<i32>) {
+    fn f(er: &ElRef<HtmlSelectElement>, idx: i32) {
+        er.get().unwrap().set_selected_index(idx);
+    }
+
+    f(er, idx.into());
 }
 
 fn load_from_password(password: &Password, normalize: bool) -> Option<Savedata> {
@@ -715,6 +826,7 @@ fn view_savedata_respawn(model: &Model) -> Node<Msg> {
             "復活地点"
         ]],
         td![select![
+            el_ref(&model.refs.respawn_select),
             id!(ID_INPUT),
             options,
             input_ev(Ev::Change, |s| s
@@ -768,6 +880,7 @@ fn view_savedata_helm(model: &Model) -> Vec<Node<Msg>> {
             ]
         ],
         div![select![
+            el_ref(&model.refs.helm_select),
             id!(ID_INPUT),
             C!(CLASS_EQUIPMENT_INPUT),
             options,
@@ -805,6 +918,7 @@ fn view_savedata_weapon(model: &Model) -> Vec<Node<Msg>> {
             ],
         ],
         div![select![
+            el_ref(&model.refs.weapon_select),
             id!(ID_INPUT),
             C!(CLASS_EQUIPMENT_INPUT),
             options,
@@ -842,6 +956,7 @@ fn view_savedata_armor(model: &Model) -> Vec<Node<Msg>> {
             ],
         ],
         div![select![
+            el_ref(&model.refs.armor_select),
             id!(ID_INPUT),
             C!(CLASS_EQUIPMENT_INPUT),
             options,
@@ -879,6 +994,7 @@ fn view_savedata_shoes(model: &Model) -> Vec<Node<Msg>> {
             ],
         ],
         div![select![
+            el_ref(&model.refs.shoes_select),
             id!(ID_INPUT),
             C!(CLASS_EQUIPMENT_INPUT),
             options,
@@ -916,6 +1032,7 @@ fn view_savedata_accessory0(model: &Model) -> Vec<Node<Msg>> {
             ],
         ],
         div![select![
+            el_ref(&model.refs.accessory0_select),
             id!(ID_INPUT),
             C!(CLASS_EQUIPMENT_INPUT),
             options,
@@ -953,6 +1070,7 @@ fn view_savedata_accessory1(model: &Model) -> Vec<Node<Msg>> {
             ],
         ],
         div![select![
+            el_ref(&model.refs.accessory1_select),
             id!(ID_INPUT),
             C!(CLASS_EQUIPMENT_INPUT),
             options,
@@ -990,6 +1108,7 @@ fn view_savedata_accessory2(model: &Model) -> Vec<Node<Msg>> {
             ],
         ],
         div![select![
+            el_ref(&model.refs.accessory2_select),
             id!(ID_INPUT),
             C!(CLASS_EQUIPMENT_INPUT),
             options,
@@ -1027,6 +1146,7 @@ fn view_savedata_accessory3(model: &Model) -> Vec<Node<Msg>> {
             ],
         ],
         div![select![
+            el_ref(&model.refs.accessory3_select),
             id!(ID_INPUT),
             C!(CLASS_EQUIPMENT_INPUT),
             options,
