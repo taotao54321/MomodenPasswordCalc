@@ -1,6 +1,5 @@
 use int_enum::IntEnum as _;
 use seed::{prelude::*, *};
-use web_sys::HtmlSelectElement;
 
 use momoden_password::*;
 
@@ -27,7 +26,6 @@ struct Model {
     normalize: bool,
     savedata: Savedata,
     passwords: Vec<Password>,
-    refs: Refs,
 }
 
 impl Default for Model {
@@ -37,27 +35,8 @@ impl Default for Model {
             normalize: true,
             savedata: Default::default(),
             passwords: Default::default(),
-            refs: Default::default(),
         }
     }
-}
-
-// NOTE:
-// seed はモデルが変化しても <select> 要素の表示を更新してくれない?
-// (https://github.com/seed-rs/seed/issues/558)
-// ブラウザによる挙動の違いもあるらしいので、<select> については自前で ElRef を持って更新する。
-#[derive(Debug, Default)]
-struct Refs {
-    respawn_select: ElRef<HtmlSelectElement>,
-    helm_select: ElRef<HtmlSelectElement>,
-    weapon_select: ElRef<HtmlSelectElement>,
-    armor_select: ElRef<HtmlSelectElement>,
-    shoes_select: ElRef<HtmlSelectElement>,
-    accessory0_select: ElRef<HtmlSelectElement>,
-    accessory1_select: ElRef<HtmlSelectElement>,
-    accessory2_select: ElRef<HtmlSelectElement>,
-    accessory3_select: ElRef<HtmlSelectElement>,
-    inventory_selects: [ElRef<HtmlSelectElement>; 8],
 }
 
 #[derive(Debug)]
@@ -101,9 +80,9 @@ fn update(msg: Msg, model: &mut Model, _orders: &mut impl Orders<Msg>) {
         Msg::QuerySubmit => match Query::parse(&model.query) {
             Ok(Query::Password(password)) => {
                 let Some(savedata) = load_from_password(&password, model.normalize) else {
-                        return;
-                    };
-                update_savedata(model, savedata);
+                    return;
+                };
+                model.savedata = savedata;
             }
             Ok(Query::Pattern(pattern)) => {
                 model.passwords = generate_passwords(&pattern, PASSWORD_COUNT_MAX)
@@ -119,7 +98,7 @@ fn update(msg: Msg, model: &mut Model, _orders: &mut impl Orders<Msg>) {
                 return;
             };
             model.query = password.display_pretty().to_string();
-            update_savedata(model, savedata);
+            model.savedata = savedata;
         }
         Msg::SavedataUpdateXp(xp) => model.savedata.xp = xp,
         Msg::SavedataUpdatePurse(purse) => model.savedata.purse = purse,
@@ -131,41 +110,22 @@ fn update(msg: Msg, model: &mut Model, _orders: &mut impl Orders<Msg>) {
         Msg::SavedataToggleTreasure(treasure) => model.savedata.treasures[treasure].toggle(),
         Msg::SavedataToggleMinion(minion) => model.savedata.minions[minion].toggle(),
         Msg::SavedataToggleBookmark(bookmark) => model.savedata.bookmarks[bookmark].toggle(),
-        Msg::SavedataUpdateRespawn(respawn) => {
-            model.savedata.respawn = respawn;
-            update_respawn_select(model);
-        }
-        Msg::SavedataUpdateHelm(helm) => {
-            model.savedata.equipment.helm = helm;
-            update_helm_select(model);
-        }
-        Msg::SavedataUpdateWeapon(weapon) => {
-            model.savedata.equipment.weapon = weapon;
-            update_weapon_select(model);
-        }
-        Msg::SavedataUpdateArmor(armor) => {
-            model.savedata.equipment.armor = armor;
-            update_armor_select(model);
-        }
-        Msg::SavedataUpdateShoes(shoes) => {
-            model.savedata.equipment.shoes = shoes;
-            update_shoes_select(model);
-        }
+        Msg::SavedataUpdateRespawn(respawn) => model.savedata.respawn = respawn,
+        Msg::SavedataUpdateHelm(helm) => model.savedata.equipment.helm = helm,
+        Msg::SavedataUpdateWeapon(weapon) => model.savedata.equipment.weapon = weapon,
+        Msg::SavedataUpdateArmor(armor) => model.savedata.equipment.armor = armor,
+        Msg::SavedataUpdateShoes(shoes) => model.savedata.equipment.shoes = shoes,
         Msg::SavedataUpdateAccessory0(accessory0) => {
             model.savedata.equipment.accessory0 = accessory0;
-            update_accessory0_select(model);
         }
         Msg::SavedataUpdateAccessory1(accessory1) => {
             model.savedata.equipment.accessory1 = accessory1;
-            update_accessory1_select(model);
         }
         Msg::SavedataUpdateAccessory2(accessory2) => {
             model.savedata.equipment.accessory2 = accessory2;
-            update_accessory2_select(model);
         }
         Msg::SavedataUpdateAccessory3(accessory3) => {
             model.savedata.equipment.accessory3 = accessory3;
-            update_accessory3_select(model);
         }
         Msg::SavedataUpdateInventory(idx, item_id) => {
             // 空欄は詰める(原作準拠)。
@@ -178,101 +138,13 @@ fn update(msg: Msg, model: &mut Model, _orders: &mut impl Orders<Msg>) {
                 }
                 (true, Some(item_id)) => inventory[idx] = item_id,
             }
-            update_inventory_selects(model);
         }
-        Msg::SavedataNormalize => {
-            model.savedata = model.savedata.normalize();
-            update_helm_select(model);
-            update_weapon_select(model);
-            update_armor_select(model);
-            update_shoes_select(model);
-            update_accessory0_select(model);
-            update_accessory1_select(model);
-            update_accessory2_select(model);
-            update_accessory3_select(model);
-        }
+        Msg::SavedataNormalize => model.savedata = model.savedata.normalize(),
         Msg::SavedataToPassword => {
             let password = save_to_password(&model.savedata);
             model.query = password.display_pretty().to_string();
         }
     }
-}
-
-fn update_savedata(model: &mut Model, savedata: Savedata) {
-    model.savedata = savedata;
-    update_respawn_select(model);
-    update_helm_select(model);
-    update_weapon_select(model);
-    update_armor_select(model);
-    update_shoes_select(model);
-    update_accessory0_select(model);
-    update_accessory1_select(model);
-    update_accessory2_select(model);
-    update_accessory3_select(model);
-    update_inventory_selects(model);
-}
-
-fn update_respawn_select(model: &Model) {
-    select_set_index(&model.refs.respawn_select, model.savedata.respawn);
-}
-
-fn update_helm_select(model: &Model) {
-    select_set_index(&model.refs.helm_select, model.savedata.equipment.helm);
-}
-
-fn update_weapon_select(model: &Model) {
-    select_set_index(&model.refs.weapon_select, model.savedata.equipment.weapon);
-}
-
-fn update_armor_select(model: &Model) {
-    select_set_index(&model.refs.armor_select, model.savedata.equipment.armor);
-}
-
-fn update_shoes_select(model: &Model) {
-    select_set_index(&model.refs.shoes_select, model.savedata.equipment.shoes);
-}
-
-fn update_accessory0_select(model: &Model) {
-    select_set_index(
-        &model.refs.accessory0_select,
-        model.savedata.equipment.accessory0,
-    );
-}
-
-fn update_accessory1_select(model: &Model) {
-    select_set_index(
-        &model.refs.accessory1_select,
-        model.savedata.equipment.accessory1,
-    );
-}
-
-fn update_accessory2_select(model: &Model) {
-    select_set_index(
-        &model.refs.accessory2_select,
-        model.savedata.equipment.accessory2,
-    );
-}
-
-fn update_accessory3_select(model: &Model) {
-    select_set_index(
-        &model.refs.accessory3_select,
-        model.savedata.equipment.accessory3,
-    );
-}
-
-fn update_inventory_selects(model: &Model) {
-    for i in 0..8 {
-        let idx = model.savedata.inventory.get(i).map_or(0, |id| id.get());
-        select_set_index(&model.refs.inventory_selects[i], idx);
-    }
-}
-
-fn select_set_index(er: &ElRef<HtmlSelectElement>, idx: impl Into<i32>) {
-    fn f(er: &ElRef<HtmlSelectElement>, idx: i32) {
-        er.get().unwrap().set_selected_index(idx);
-    }
-
-    f(er, idx.into());
 }
 
 fn load_from_password(password: &Password, normalize: bool) -> Option<Savedata> {
@@ -290,6 +162,11 @@ fn save_to_password(savedata: &Savedata) -> Password {
     let bytes = SerializedBytes::from_savedata(savedata);
     bytes.to_password()
 }
+
+// <select> 要素の扱いについて:
+// <option> の selected 属性ではなく、<select> の value 属性を設定するのが正しい。
+//
+// ref: https://github.com/seed-rs/seed/issues/558
 
 fn view(model: &Model) -> Node<Msg> {
     div![
@@ -808,11 +685,9 @@ fn view_savedata_respawn(model: &Model) -> Node<Msg> {
 
     let options = RespawnId::all().map(|respawn| {
         let text = format!("0x{respawn:X}: {}", respawn_name(respawn));
-        let selected = respawn == model.savedata.respawn;
         option![
             attrs! {
                 At::Value => respawn,
-                At::Selected => selected.as_at_value(),
             },
             text
         ]
@@ -826,8 +701,10 @@ fn view_savedata_respawn(model: &Model) -> Node<Msg> {
             "復活地点"
         ]],
         td![select![
-            el_ref(&model.refs.respawn_select),
             id!(ID_INPUT),
+            attrs! {
+                At::Value => model.savedata.respawn,
+            },
             options,
             input_ev(Ev::Change, |s| s
                 .parse::<RespawnId>()
@@ -859,11 +736,9 @@ fn view_savedata_helm(model: &Model) -> Vec<Node<Msg>> {
 
     let options = HelmIndex::all().map(|helm| {
         let text = format!("0x{helm:02X}: {}", helm_index_name(helm));
-        let selected = helm == model.savedata.equipment.helm;
         option![
             attrs! {
                 At::Value => helm,
-                At::Selected => selected.as_at_value(),
             },
             text
         ]
@@ -880,9 +755,11 @@ fn view_savedata_helm(model: &Model) -> Vec<Node<Msg>> {
             ]
         ],
         div![select![
-            el_ref(&model.refs.helm_select),
             id!(ID_INPUT),
             C!(CLASS_EQUIPMENT_INPUT),
+            attrs! {
+                At::Value => model.savedata.equipment.helm,
+            },
             options,
             input_ev(Ev::Change, |s| s
                 .parse::<HelmIndex>()
@@ -897,11 +774,9 @@ fn view_savedata_weapon(model: &Model) -> Vec<Node<Msg>> {
 
     let options = WeaponIndex::all().map(|weapon| {
         let text = format!("0x{weapon:02X}: {}", weapon_index_name(weapon));
-        let selected = weapon == model.savedata.equipment.weapon;
         option![
             attrs! {
                 At::Value => weapon,
-                At::Selected => selected.as_at_value(),
             },
             text
         ]
@@ -918,9 +793,11 @@ fn view_savedata_weapon(model: &Model) -> Vec<Node<Msg>> {
             ],
         ],
         div![select![
-            el_ref(&model.refs.weapon_select),
             id!(ID_INPUT),
             C!(CLASS_EQUIPMENT_INPUT),
+            attrs! {
+                At::Value => model.savedata.equipment.weapon,
+            },
             options,
             input_ev(Ev::Change, |s| s
                 .parse::<WeaponIndex>()
@@ -935,11 +812,9 @@ fn view_savedata_armor(model: &Model) -> Vec<Node<Msg>> {
 
     let options = ArmorIndex::all().map(|armor| {
         let text = format!("0x{armor:02X}: {}", armor_index_name(armor));
-        let selected = armor == model.savedata.equipment.armor;
         option![
             attrs! {
                 At::Value => armor,
-                At::Selected => selected.as_at_value(),
             },
             text
         ]
@@ -956,9 +831,11 @@ fn view_savedata_armor(model: &Model) -> Vec<Node<Msg>> {
             ],
         ],
         div![select![
-            el_ref(&model.refs.armor_select),
             id!(ID_INPUT),
             C!(CLASS_EQUIPMENT_INPUT),
+            attrs! {
+                At::Value => model.savedata.equipment.armor,
+            },
             options,
             input_ev(Ev::Change, |s| s
                 .parse::<ArmorIndex>()
@@ -973,11 +850,9 @@ fn view_savedata_shoes(model: &Model) -> Vec<Node<Msg>> {
 
     let options = ShoesIndex::all().map(|shoes| {
         let text = format!("0x{shoes:02X}: {}", shoes_index_name(shoes));
-        let selected = shoes == model.savedata.equipment.shoes;
         option![
             attrs! {
                 At::Value => shoes,
-                At::Selected => selected.as_at_value(),
             },
             text
         ]
@@ -994,9 +869,11 @@ fn view_savedata_shoes(model: &Model) -> Vec<Node<Msg>> {
             ],
         ],
         div![select![
-            el_ref(&model.refs.shoes_select),
             id!(ID_INPUT),
             C!(CLASS_EQUIPMENT_INPUT),
+            attrs! {
+                At::Value => model.savedata.equipment.shoes,
+            },
             options,
             input_ev(Ev::Change, |s| s
                 .parse::<ShoesIndex>()
@@ -1011,11 +888,9 @@ fn view_savedata_accessory0(model: &Model) -> Vec<Node<Msg>> {
 
     let options = Accessory0Index::all().map(|accessory0| {
         let text = format!("0x{accessory0:02X}: {}", accessory0_index_name(accessory0));
-        let selected = accessory0 == model.savedata.equipment.accessory0;
         option![
             attrs! {
                 At::Value => accessory0,
-                At::Selected => selected.as_at_value(),
             },
             text
         ]
@@ -1032,9 +907,11 @@ fn view_savedata_accessory0(model: &Model) -> Vec<Node<Msg>> {
             ],
         ],
         div![select![
-            el_ref(&model.refs.accessory0_select),
             id!(ID_INPUT),
             C!(CLASS_EQUIPMENT_INPUT),
+            attrs! {
+                At::Value => model.savedata.equipment.accessory0,
+            },
             options,
             input_ev(Ev::Change, |s| s
                 .parse::<Accessory0Index>()
@@ -1049,11 +926,9 @@ fn view_savedata_accessory1(model: &Model) -> Vec<Node<Msg>> {
 
     let options = Accessory1Index::all().map(|accessory1| {
         let text = format!("0x{accessory1:02X}: {}", accessory1_index_name(accessory1));
-        let selected = accessory1 == model.savedata.equipment.accessory1;
         option![
             attrs! {
                 At::Value => accessory1,
-                At::Selected => selected.as_at_value(),
             },
             text
         ]
@@ -1070,9 +945,11 @@ fn view_savedata_accessory1(model: &Model) -> Vec<Node<Msg>> {
             ],
         ],
         div![select![
-            el_ref(&model.refs.accessory1_select),
             id!(ID_INPUT),
             C!(CLASS_EQUIPMENT_INPUT),
+            attrs! {
+                At::Value => model.savedata.equipment.accessory1,
+            },
             options,
             input_ev(Ev::Change, |s| s
                 .parse::<Accessory1Index>()
@@ -1087,11 +964,9 @@ fn view_savedata_accessory2(model: &Model) -> Vec<Node<Msg>> {
 
     let options = Accessory2Index::all().map(|accessory2| {
         let text = format!("0x{accessory2:02X}: {}", accessory2_index_name(accessory2));
-        let selected = accessory2 == model.savedata.equipment.accessory2;
         option![
             attrs! {
                 At::Value => accessory2,
-                At::Selected => selected.as_at_value(),
             },
             text
         ]
@@ -1108,9 +983,11 @@ fn view_savedata_accessory2(model: &Model) -> Vec<Node<Msg>> {
             ],
         ],
         div![select![
-            el_ref(&model.refs.accessory2_select),
             id!(ID_INPUT),
             C!(CLASS_EQUIPMENT_INPUT),
+            attrs! {
+                At::Value => model.savedata.equipment.accessory2,
+            },
             options,
             input_ev(Ev::Change, |s| s
                 .parse::<Accessory2Index>()
@@ -1125,11 +1002,9 @@ fn view_savedata_accessory3(model: &Model) -> Vec<Node<Msg>> {
 
     let options = Accessory3Index::all().map(|accessory3| {
         let text = format!("0x{accessory3:02X}: {}", accessory3_index_name(accessory3));
-        let selected = accessory3 == model.savedata.equipment.accessory3;
         option![
             attrs! {
                 At::Value => accessory3,
-                At::Selected => selected.as_at_value(),
             },
             text
         ]
@@ -1146,9 +1021,11 @@ fn view_savedata_accessory3(model: &Model) -> Vec<Node<Msg>> {
             ],
         ],
         div![select![
-            el_ref(&model.refs.accessory3_select),
             id!(ID_INPUT),
             C!(CLASS_EQUIPMENT_INPUT),
+            attrs! {
+                At::Value => model.savedata.equipment.accessory3,
+            },
             options,
             input_ev(Ev::Change, |s| s
                 .parse::<Accessory3Index>()
@@ -1165,24 +1042,22 @@ fn view_savedata_inventory(model: &Model) -> Node<Msg> {
 }
 
 fn view_savedata_inventory_item(model: &Model, idx: usize) -> Node<Msg> {
-    let item_id = model.savedata.inventory.get(idx).copied();
-
     let options = (0..=ItemId::MAX_VALUE).map(|i| {
         let id = ItemId::new(i);
         let text = format!("0x{i:02X}: {}", id.map_or("(空欄)", item_name));
-        let selected = i == item_id.map_or(0, ItemId::get);
         option![
             attrs! {
                 At::Value => i,
-                At::Selected => selected.as_at_value(),
             },
             text
         ]
     });
 
     div![select![
-        el_ref(&model.refs.inventory_selects[idx]),
         options,
+        attrs! {
+            At::Value => model.savedata.inventory.get(idx).map_or(0, |id| id.get()),
+        },
         input_ev(Ev::Change, move |s| s
             .parse::<u8>()
             .ok()
