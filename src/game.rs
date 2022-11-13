@@ -432,7 +432,7 @@ pub(crate) fn accessory0_index_name(accessory0: Accessory0Index) -> &'static str
 
 pub(crate) fn accessory1_index_name(accessory1: Accessory1Index) -> &'static str {
     const TABLE: [&str; (Accessory1Index::MAX_VALUE + 1) as usize] =
-        ["(無装備)", "カイロ", "タカのつめ", "(空欄: 無視される)"];
+        ["(無装備)", "カイロ", "タカのツメ", "(空欄: 無視される)"];
 
     TABLE[usize::from(accessory1)]
 }
